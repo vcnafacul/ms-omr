@@ -1,6 +1,9 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "integration: teste que roda o OMRChecker de verdade (subprocess + opencv)",
+]
 
 [tool.ruff]
 line-length = 100
