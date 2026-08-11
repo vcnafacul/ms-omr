@@ -1,4 +1,5 @@
 import csv
+import json
 import os
 import shutil
 import subprocess
@@ -43,6 +44,9 @@ def run_omr(image: bytes | str | Path, template_dir: str | Path) -> RawOmrResult
         shutil.copytree(template_dir, input_dir)
         output_dir.mkdir()
 
+        # serviço headless: nunca deixar o OMRChecker exibir imagens (trava em waitKey/plt.show)
+        _force_headless_config(input_dir)
+
         image_name = f"{_INPUT_STEM}{_image_suffix(image)}"
         target = input_dir / image_name
         if isinstance(image, bytes):
@@ -81,6 +85,26 @@ def _image_suffix(image: bytes | str | Path) -> str:
     if isinstance(image, bytes):
         return ".png"
     return Path(image).suffix or ".png"
+
+
+def _force_headless_config(input_dir: Path) -> None:
+    """Força ``outputs.show_image_level = 0`` no config.json do input dir.
+
+    O OMRChecker, com ``show_image_level`` > 0, abre janelas (cv2.imshow/plt.show) que travam
+    num ambiente headless/serviço. O default do OMRChecker é 0, mas um template pode trazer um
+    config.json com valor maior — aqui garantimos que nunca haja display, seja qual for o template.
+    """
+    config_path = input_dir / "config.json"
+    if not config_path.exists():
+        return
+    try:
+        config = json.loads(config_path.read_text())
+        outputs = config.setdefault("outputs", {})
+        outputs["show_image_level"] = 0
+        config_path.write_text(json.dumps(config))
+    except (OSError, ValueError, TypeError, AttributeError):
+        # config.json malformado: deixa o OMRChecker lidar (usa defaults / erra explicitamente)
+        return
 
 
 def _parse_results(output_dir: Path, image_name: str) -> RawOmrResult:
