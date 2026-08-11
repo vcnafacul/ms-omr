@@ -6,3 +6,5 @@ __pycache__/
 tests/
 .ruff_cache/
 .pytest_cache/
+vendor/omrchecker/samples/
+vendor/omrchecker/docs/

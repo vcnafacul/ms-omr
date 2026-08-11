@@ -2,3 +2,8 @@ fastapi
 uvicorn[standard]
 pydantic
 pydantic-settings
+
+# OMR engine (OMRChecker vendorizado)
+-r vendor/omrchecker/requirements.txt
+opencv-python-headless
+pillow
