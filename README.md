@@ -13,6 +13,14 @@ uv run uvicorn app.main:app --reload
 # http://localhost:8000/docs    →  Swagger
 ```
 
+## Rodar via Docker (local)
+
+```bash
+make up      # build da imagem + sobe o container (detached) em localhost:8000
+make logs    # acompanha os logs do container
+make down    # para e remove o container
+```
+
 ## Rodar via monorepo
 
 `../dev.sh` sobe o ms-omr junto dos demais serviços (porta 8000).
