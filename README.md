@@ -7,7 +7,7 @@ Stateless: recebe `imageR2Key`, baixa do R2, lê o cartão e devolve JSON.
 
 ```bash
 uv venv --python 3.11
-uv pip sync requirements-dev.txt
+uv pip install -r requirements-dev.txt
 uv run uvicorn app.main:app --reload
 # http://localhost:8000/health  →  {"status": "ok"}
 # http://localhost:8000/docs    →  Swagger
