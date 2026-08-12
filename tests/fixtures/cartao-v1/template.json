@@ -1,7 +1,7 @@
 {
   "pageDimensions": [
-    2480,
-    3508
+    2160,
+    3188
   ],
   "bubbleDimensions": [
     60,
@@ -20,8 +20,8 @@
     "matricula": {
       "fieldType": "QTYPE_INT",
       "origin": [
-        310,
-        870
+        150,
+        710
       ],
       "fieldLabels": [
         "m1..8"
@@ -32,37 +32,37 @@
     "respostas_c1": {
       "fieldType": "QTYPE_MCQ5",
       "origin": [
-        200,
-        1750
+        40,
+        1530
       ],
       "fieldLabels": [
         "q1..30"
       ],
-      "labelsGap": 55,
+      "labelsGap": 50,
       "bubblesGap": 92
     },
     "respostas_c2": {
       "fieldType": "QTYPE_MCQ5",
       "origin": [
-        960,
-        1750
+        800,
+        1530
       ],
       "fieldLabels": [
         "q31..60"
       ],
-      "labelsGap": 55,
+      "labelsGap": 50,
       "bubblesGap": 92
     },
     "respostas_c3": {
       "fieldType": "QTYPE_MCQ5",
       "origin": [
-        1720,
-        1750
+        1560,
+        1530
       ],
       "fieldLabels": [
         "q61..90"
       ],
-      "labelsGap": 55,
+      "labelsGap": 50,
       "bubblesGap": 92
     }
   }
