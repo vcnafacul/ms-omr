@@ -20,8 +20,8 @@
     "matricula": {
       "fieldType": "QTYPE_INT",
       "origin": [
-        340,
-        900
+        310,
+        870
       ],
       "fieldLabels": [
         "m1..8"
@@ -32,8 +32,8 @@
     "respostas_c1": {
       "fieldType": "QTYPE_MCQ5",
       "origin": [
-        230,
-        1780
+        200,
+        1750
       ],
       "fieldLabels": [
         "q1..30"
@@ -44,8 +44,8 @@
     "respostas_c2": {
       "fieldType": "QTYPE_MCQ5",
       "origin": [
-        990,
-        1780
+        960,
+        1750
       ],
       "fieldLabels": [
         "q31..60"
@@ -56,8 +56,8 @@
     "respostas_c3": {
       "fieldType": "QTYPE_MCQ5",
       "origin": [
-        1750,
-        1780
+        1720,
+        1750
       ],
       "fieldLabels": [
         "q61..90"
