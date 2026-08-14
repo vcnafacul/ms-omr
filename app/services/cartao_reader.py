@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from app.services.omr_engine import run_omr
 
 _ALTERNATIVAS = ("A", "B", "C", "D", "E")
+_QUESTAO_KEY = re.compile(r"q(\d+)")
 
 
 class RespostaCartao(BaseModel):
@@ -34,7 +35,7 @@ def _estruturar_respostas(fields: dict[str, str]) -> list[RespostaCartao]:
     """
     out: list[RespostaCartao] = []
     for key, val in fields.items():
-        m = re.fullmatch(r"q(\d+)", key)
+        m = _QUESTAO_KEY.fullmatch(key)
         if m and val in _ALTERNATIVAS:
             out.append(RespostaCartao(questao=m.group(1), alternativaEstudante=val))
     out.sort(key=lambda r: int(r.questao))
