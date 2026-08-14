@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     aws_access_key_id: str | None = None
     aws_secret_access_key: str | None = None
 
+    # Bucket dos cartões + cache (card 05)
+    omr_bucket: str = "vcnafacul-cartoes"
+    redis_url: str | None = None
+    omr_cache_ttl_seconds: int = 3600
+
 
 @lru_cache
 def get_settings() -> Settings:

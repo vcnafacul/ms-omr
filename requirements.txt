@@ -7,3 +7,7 @@ pydantic-settings
 -r vendor/omrchecker/requirements.txt
 opencv-python-headless
 pillow
+
+# Storage + cache (card 05)
+boto3
+redis
