@@ -1,8 +1,15 @@
+from pathlib import Path
+
+import pytest
+
 from app.services.cartao_reader import (
     LeituraCartao,
     RespostaCartao,
     _estruturar_respostas,
+    ler_cartao,
 )
+
+_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "cartao-real-v1"
 
 
 def test_estruturar_filtra_single_omite_branco_dupla_e_matricula():
@@ -35,3 +42,17 @@ def test_leitura_cartao_shape():
     )
     assert m.idImage == "x"
     assert m.respostas[0].alternativaEstudante == "A"
+
+
+@pytest.mark.integration
+def test_ler_cartao_foto_real_ecoa_id_e_estrutura_respostas():
+    leitura = ler_cartao("img-abc", _FIXTURE / "foto.jpeg", _FIXTURE)
+
+    assert leitura.idImage == "img-abc"
+    # a foto do card 03 leu 90/90 single (sem branco/dupla)
+    assert len(leitura.respostas) == 90
+    por_numero = {r.questao: r.alternativaEstudante for r in leitura.respostas}
+    assert por_numero["1"] == "A"
+    assert por_numero["73"] == "D"
+    # matrícula e metadados não entram
+    assert all(r.questao.isdigit() for r in leitura.respostas)
