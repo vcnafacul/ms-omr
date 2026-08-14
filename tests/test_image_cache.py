@@ -41,8 +41,11 @@ def test_cache_set_grava_com_ttl(monkeypatch):
             chamado.update(key=key, data=data, ex=ex)
 
     monkeypatch.setattr(image_cache, "_redis", lambda: _R())
+    from app.config import get_settings
+
     cache_set("k", b"data")
-    assert chamado == {"key": "omr:img:k", "data": b"data", "ex": 3600}
+    ttl = get_settings().omr_cache_ttl_seconds
+    assert chamado == {"key": "omr:img:k", "data": b"data", "ex": ttl}
 
 
 def test_cache_set_erro_e_gracioso(monkeypatch):

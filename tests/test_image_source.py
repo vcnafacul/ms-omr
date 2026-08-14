@@ -1,4 +1,7 @@
+import pytest
+
 from app.services import image_source
+from app.services.bucket_storage import StorageError
 from app.services.image_source import obter_imagem
 
 
@@ -31,3 +34,15 @@ def test_obter_imagem_miss_baixa_e_grava(monkeypatch):
 
     assert obter_imagem("k") == b"FROM-BUCKET"
     assert gravado == {"key": "k", "data": b"FROM-BUCKET"}
+
+
+def test_obter_imagem_miss_propaga_storage_error(monkeypatch):
+    def _falha(key):
+        raise StorageError("não encontrada")
+
+    monkeypatch.setattr(image_source, "cache_get", lambda key: None)
+    monkeypatch.setattr(image_source, "baixar_imagem", _falha)
+    monkeypatch.setattr(image_source, "cache_set", lambda *a, **k: None)
+
+    with pytest.raises(StorageError):
+        obter_imagem("k")
