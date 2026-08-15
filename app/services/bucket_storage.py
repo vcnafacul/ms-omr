@@ -11,6 +11,10 @@ class StorageError(Exception):
     """Falha ao acessar o storage (key inexistente, credenciais, conexão)."""
 
 
+class StorageNotFound(StorageError):
+    """Objeto inexistente (NoSuchKey/404). Subclasse de StorageError."""
+
+
 @lru_cache
 def _client():
     s = get_settings()
@@ -33,7 +37,7 @@ def baixar_imagem(key: str) -> bytes:
     except ClientError as exc:
         code = exc.response.get("Error", {}).get("Code")
         if code in ("NoSuchKey", "404"):
-            raise StorageError(f"imagem não encontrada: {key}") from exc
+            raise StorageNotFound(f"imagem não encontrada: {key}") from exc
         raise StorageError(f"erro de storage ({code}) ao ler {key}") from exc
     except BotoCoreError as exc:
         raise StorageError(f"falha de conexão ao storage ao ler {key}") from exc
