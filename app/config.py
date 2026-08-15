@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     redis_url: str | None = None
     omr_cache_ttl_seconds: int = 3600
 
+    # Callback do resultado do OMR (card 06)
+    callback_url: str = "http://localhost:3333/omr/callback"
+
 
 @lru_cache
 def get_settings() -> Settings:

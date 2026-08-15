@@ -4,6 +4,7 @@ testpaths = ["tests"]
 markers = [
     "integration: teste que roda o OMRChecker de verdade (subprocess + opencv)",
 ]
+asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
