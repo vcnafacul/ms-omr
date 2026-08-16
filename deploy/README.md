@@ -31,12 +31,14 @@ também** (fila de respostas disparada pelo callback do cartão). Solução: `su
 chmod +x ~/subir_redis.sh && ~/subir_redis.sh
 ```
 
-### 2. RAM apertada (risco de OOM)
-Limites já usados: api 350m + simulado 200m + form 200m ≈ 750m (de 954m). Somando redis (~80m)
-e ms-omr (450m), a VM fica **oversubscribed** (sobra swap). O OMR (opencv) dá picos de memória —
-com `OMR_MAX_WORKERS=1` o risco cai, mas **recomendo fortemente upgradear a VM** (ou um host
-dedicado pro OMR) antes de uso real. Os limites em `subir_ms_omr.sh` são conservadores; ajuste
-se a VM crescer.
+### 2. RAM (homol é pequena de propósito)
+Homol (~954MB, 2 vCPU) é enxuto e serve pra **teste leve**. Com `OMR_MAX_WORKERS=1` + os limites
+conservadores do `subir_ms_omr.sh` (450m / 900m swap), roda um cartão por vez; se um pico do
+opencv apertar, o swap (2GB) segura. **Não precisa upgradear homol.**
+
+**Produção (2 vCPU / 8GB)** tem folga de sobra. No script de deploy de prod (a montar, junto de um
+`ci-prod.yml` como o do api), dá pra subir o `--memory` do ms-omr bem acima (ex.: 1–2g);
+`OMR_MAX_WORKERS=1` continua adequado (2 núcleos → CPU-bound).
 
 ## Passo a passo no servidor (uma vez)
 
