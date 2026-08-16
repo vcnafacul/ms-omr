@@ -1,6 +1,8 @@
+import os
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +32,10 @@ class Settings(BaseSettings):
 
     # Callback do resultado do OMR (card 06)
     callback_url: str = "http://localhost:3333/omr/callback"
+
+    # Worker in-process (Opção A)
+    omr_max_workers: int = Field(default_factory=lambda: max(1, (os.cpu_count() or 2) - 1))
+    omr_inprocess_worker: bool = True
 
 
 @lru_cache
