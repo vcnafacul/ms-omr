@@ -1,0 +1,61 @@
+name: vCnafacul ms-omr
+on:
+  pull_request:
+    branches: ['develop']
+    types: [opened, synchronize, reopened, closed]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Roda em cada push do PR: lint + format + testes unitários (sem OMRChecker/opencv).
+  CI:
+    if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instala uv
+        uses: astral-sh/setup-uv@v5
+      - name: venv + deps
+        run: |
+          uv venv
+          uv pip install -r requirements.txt -r requirements-dev.txt
+      - name: Ruff (lint)
+        run: uv run ruff check .
+      - name: Black (format check)
+        run: uv run black --check .
+      - name: Pytest (unit — marker "not integration")
+        run: uv run pytest -m "not integration"
+
+  # No merge do PR: builda a imagem Docker do ms-omr e publica no Docker Hub.
+  PUSH:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+      - name: Build Image
+        run: docker build -t vcnafacul/ms-omr:latest -f omr.dockerfile .
+      - name: Docker login
+        run: docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+      - name: Image Push
+        run: docker push vcnafacul/ms-omr:latest
+
+  # No merge pra develop: SSH no servidor de homolog e roda o script de subida.
+  DEPLOY_HOMOL:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.base_ref == 'develop'
+    needs: PUSH
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy em Homolog (Oracle VPS)
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST_HOMOL }}
+          username: ${{ secrets.DEPLOY_USER_HOMOL }}
+          key: ${{ secrets.DEPLOY_KEY_HOMOL }}
+          script: |
+            chmod +x ~/subir_ms_omr.sh
+            ~/subir_ms_omr.sh
