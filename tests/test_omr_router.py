@@ -1,6 +1,18 @@
+import pytest
 from fastapi.testclient import TestClient
 
+import app.main as main
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def _isolar_worker_e_pool(monkeypatch):
+    # Desabilita o worker in-process para não subir um worker real (Redis) nos
+    # testes de enqueue. Zera redis_url para que o lifespan não crie um pool real
+    # (o .env local pode ter REDIS_URL apontando p/ um Redis no ar) — assim o pool
+    # setado por cada teste é preservado.
+    monkeypatch.setattr(main.settings, "omr_inprocess_worker", False)
+    monkeypatch.setattr(main.settings, "redis_url", None)
 
 
 class FakePool:
