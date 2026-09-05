@@ -22,10 +22,11 @@ else
 	docker network create $nome_rede
 fi
 
-# ⚠️ VM pequena (2 vCPU / ~1GB RAM). OMR (opencv/OMRChecker) é pesado — mantenha
-# OMR_MAX_WORKERS=1 no ./env/.env.omr. Limites conservadores; ajuste se a VM crescer.
+# Homol: VPS Hostinger, 4GB RAM / 1 vCPU. RAM sobra; a CPU é o recurso escasso —
+# o OMR (opencv/OMRChecker) é CPU-bound e divide o único núcleo com api/ms-simulado.
+# --cpus 0.75 evita que uma leitura monopolize a máquina; OMR_MAX_WORKERS=1 no ./env/.env.omr.
 docker run --name $nome_container \
-	--memory 450m --memory-swap 900m --cpus 1.0 \
+	--memory 1g --memory-swap 1500m --cpus 0.75 \
 	--restart unless-stopped \
 	--env-file ./env/.env.omr \
 	--network $nome_rede \

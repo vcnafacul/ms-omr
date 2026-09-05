@@ -4,7 +4,7 @@ set -e # se der erro, saia!
 
 # Deploy do ms-omr em PRODUÇÃO. Mesmo script do homol, com duas diferenças:
 #  - puxa a tag :stable (a que o ci-prod.yml publica no push de tag), não :latest;
-#  - limites de memória maiores — prod é 2 vCPU / 8GB (homol é ~954MB).
+#  - limites maiores — prod é 2 vCPU / 8GB (homol é 1 vCPU / 4GB).
 # Vai pra `~/subir_ms_omr.sh` no servidor de PROD (mesmo nome que o ci-prod chama).
 
 nome_image="vcnafacul/ms-omr:stable"
@@ -22,7 +22,7 @@ else
 	docker network create $nome_rede
 fi
 
-# Prod tem folga (8GB). OMR_MAX_WORKERS=1 continua adequado: 2 núcleos, carga CPU-bound.
+# Prod tem folga (8GB, 2 núcleos). OMR_MAX_WORKERS=1 continua adequado: carga CPU-bound.
 docker run --name $nome_container \
 	--memory 2g --memory-swap 3g --cpus 1.5 \
 	--restart unless-stopped \

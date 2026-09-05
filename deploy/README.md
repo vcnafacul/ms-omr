@@ -4,7 +4,8 @@ Espelha o padrão dos outros serviços (api/ms-simulado/form): a pipeline builda
 Docker, publica no Docker Hub e faz SSH no servidor de homolog rodando um script `subir_*.sh`
 que sobe o container na rede `network-vcnafacul`.
 
-Servidor homol: **Oracle VPS `168.138.157.99`** (user `ubuntu`), **2 vCPU / ~954MB RAM**.
+Servidor homol: **VPS Hostinger `85.31.61.20`**, **1 vCPU / 4GB RAM** — máquina separada da de
+produção (também Hostinger, 2 vCPU / 8GB). Auth SSH por **senha** nos dois.
 
 ## Arquivos deste PR/pasta
 
@@ -33,14 +34,14 @@ também** (fila de respostas disparada pelo callback do cartão). Solução: `su
 chmod +x ~/subir_redis.sh && ~/subir_redis.sh
 ```
 
-### 2. RAM (homol é pequena de propósito)
-Homol (~954MB, 2 vCPU) é enxuto e serve pra **teste leve**. Com `OMR_MAX_WORKERS=1` + os limites
-conservadores do `subir_ms_omr.sh` (450m / 900m swap), roda um cartão por vez; se um pico do
-opencv apertar, o swap (2GB) segura. **Não precisa upgradear homol.**
+### 2. Em homol o gargalo é CPU, não RAM
+Homol tem 4GB (folga de sobra pro opencv) mas **1 vCPU só**, dividido com api/ms-simulado/redis.
+O OMR é CPU-bound: sem limite, uma leitura monopoliza o núcleo e a API engasga junto. Daí
+`--cpus 0.75` + `--memory 1g` no `subir_ms_omr.sh`, e `OMR_MAX_WORKERS=1` no `.env.omr`
+(1 núcleo → não adianta paralelizar).
 
-**Produção (2 vCPU / 8GB)** tem folga de sobra. No script de deploy de prod (a montar, junto de um
-`ci-prod.yml` como o do api), dá pra subir o `--memory` do ms-omr bem acima (ex.: 1–2g);
-`OMR_MAX_WORKERS=1` continua adequado (2 núcleos → CPU-bound).
+**Produção (2 vCPU / 8GB)** tem folga maior: `subir_ms_omr.prod.sh` usa `--memory 2g --cpus 1.5`.
+`OMR_MAX_WORKERS=1` continua adequado mesmo lá.
 
 ## Passo a passo no servidor (uma vez)
 
