@@ -40,7 +40,7 @@ jobs:
       - name: Build Image
         run: docker build -t vcnafacul/ms-omr:latest -f omr.dockerfile .
       - name: Docker login
-        run: docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
       - name: Image Push
         run: docker push vcnafacul/ms-omr:latest
 
@@ -55,7 +55,7 @@ jobs:
         with:
           host: ${{ secrets.DEPLOY_HOST_HOMOL }}
           username: ${{ secrets.DEPLOY_USER_HOMOL }}
-          key: ${{ secrets.DEPLOY_KEY_HOMOL }}
+          password: ${{ secrets.DEPLOY_PASS_HOMOL }}
           script: |
             chmod +x ~/subir_ms_omr.sh
             ~/subir_ms_omr.sh

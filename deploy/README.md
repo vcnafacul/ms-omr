@@ -59,7 +59,8 @@ Depois disso, cada merge de PR pra `develop` no ms-omr roda o deploy sozinho (PU
 ## Secrets do GitHub (repo ms-omr é novo → precisa cadastrar)
 
 Mesmos secrets que o repo do api já tem:
-`DOCKER_USER`, `DOCKER_PASSWORD`, `DEPLOY_HOST_HOMOL`, `DEPLOY_USER_HOMOL`, `DEPLOY_KEY_HOMOL`.
+`DOCKER_USER`, `DOCKER_PASSWORD`, `DEPLOY_HOST_HOMOL`, `DEPLOY_USER_HOMOL`, `DEPLOY_PASS_HOMOL`
+(SSH por **senha**, igual ao ms-simulado/api — não por chave).
 
 ## Envs a ajustar nos OUTROS projetos (pro fluxo do cartão fechar em homol)
 
