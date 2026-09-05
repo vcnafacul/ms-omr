@@ -1,0 +1,93 @@
+{
+  "pageDimensions": [
+    2330,
+    3358
+  ],
+  "bubbleDimensions": [
+    40,
+    40
+  ],
+  "preProcessors": [
+    {
+      "name": "CropOnMarkers",
+      "options": {
+        "relativePath": "omr_marker.png",
+        "sheetToMarkerWidthRatio": 28
+      }
+    }
+  ],
+  "fieldBlocks": {
+    "matricula": {
+      "fieldType": "QTYPE_INT",
+      "origin": [
+        75,
+        625
+      ],
+      "fieldLabels": [
+        "m1..8"
+      ],
+      "labelsGap": 95,
+      "bubblesGap": 62
+    },
+    "respostas_c1": {
+      "fieldType": "QTYPE_MCQ5",
+      "origin": [
+        103,
+        1355
+      ],
+      "fieldLabels": [
+        "q1..18"
+      ],
+      "labelsGap": 108,
+      "bubblesGap": 75
+    },
+    "respostas_c2": {
+      "fieldType": "QTYPE_MCQ5",
+      "origin": [
+        566,
+        1355
+      ],
+      "fieldLabels": [
+        "q19..36"
+      ],
+      "labelsGap": 108,
+      "bubblesGap": 75
+    },
+    "respostas_c3": {
+      "fieldType": "QTYPE_MCQ5",
+      "origin": [
+        1029,
+        1355
+      ],
+      "fieldLabels": [
+        "q37..54"
+      ],
+      "labelsGap": 108,
+      "bubblesGap": 75
+    },
+    "respostas_c4": {
+      "fieldType": "QTYPE_MCQ5",
+      "origin": [
+        1492,
+        1355
+      ],
+      "fieldLabels": [
+        "q55..72"
+      ],
+      "labelsGap": 108,
+      "bubblesGap": 75
+    },
+    "respostas_c5": {
+      "fieldType": "QTYPE_MCQ5",
+      "origin": [
+        1955,
+        1355
+      ],
+      "fieldLabels": [
+        "q73..90"
+      ],
+      "labelsGap": 108,
+      "bubblesGap": 75
+    }
+  }
+}

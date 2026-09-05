@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# OMR engine (OMRChecker vendorizado)
+-r vendor/omrchecker/requirements.txt
+opencv-python-headless
+pillow
+
+# Storage + cache (card 05)
+boto3
+redis
+
+# Fila assíncrona + callback (card 06)
+arq
+httpx
