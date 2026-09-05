@@ -37,11 +37,11 @@ jobs:
         with:
           ref: develop
           fetch-depth: 0
-      - name: Build Image
+      - name: Build Docker image
         run: docker build -t vcnafacul/ms-omr:latest -f omr.dockerfile .
       - name: Docker login
-        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
-      - name: Image Push
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+      - name: Push Docker image
         run: docker push vcnafacul/ms-omr:latest
 
   # No merge pra develop: SSH no servidor de homolog e roda o script de subida.
@@ -50,7 +50,7 @@ jobs:
     needs: PUSH
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy em Homolog (Oracle VPS)
+      - name: Deploy em Homolog (Hostinger)
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.DEPLOY_HOST_HOMOL }}

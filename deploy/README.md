@@ -4,14 +4,17 @@ Espelha o padrão dos outros serviços (api/ms-simulado/form): a pipeline builda
 Docker, publica no Docker Hub e faz SSH no servidor de homolog rodando um script `subir_*.sh`
 que sobe o container na rede `network-vcnafacul`.
 
-Servidor homol: **Oracle VPS `168.138.157.99`** (user `ubuntu`), **2 vCPU / ~954MB RAM**.
+Servidor homol: **VPS Hostinger `85.31.61.20`**, **1 vCPU / 4GB RAM** — máquina separada da de
+produção (também Hostinger, 2 vCPU / 8GB). Auth SSH por **senha** nos dois.
 
 ## Arquivos deste PR/pasta
 
 | Arquivo | O quê | Vai pra onde |
 |---|---|---|
-| `.github/workflows/ci-homol.yml` | Workflow: **CI** (ruff/black/pytest no PR) → **PUSH** (build+push `vcnafacul/ms-omr:latest`) → **DEPLOY_HOMOL** (SSH roda `subir_ms_omr.sh`) | repo ms-omr |
-| `deploy/subir_ms_omr.sh` | Script de subida do container ms-omr (interno, sem porta publicada) | **copiar pra `~/subir_ms_omr.sh`** no servidor |
+| `.github/workflows/ci-homol.yml` | Workflow de homolog: **CI** (ruff/black/pytest no PR) → **PUSH** (build+push `vcnafacul/ms-omr:latest`) → **DEPLOY_HOMOL** (SSH roda `subir_ms_omr.sh`) | repo ms-omr |
+| `.github/workflows/ci-prod.yml` | Workflow de produção (push de tag `1.2.0`): **BUILD_AND_PUSH** (`:<tag>` + `:stable`) → **DEPLOY_PROD** → **CREATE_RELEASE**. Igual ao `ci-prod.yml` do api/ms-simulado/form | repo ms-omr |
+| `deploy/subir_ms_omr.sh` | Script de subida do container em **homol** (`:latest`, interno, sem porta publicada) | **copiar pra `~/subir_ms_omr.sh`** no servidor de homol |
+| `deploy/subir_ms_omr.prod.sh` | Mesmo script para **prod** (`:stable`, limites maiores) | **copiar pra `~/subir_ms_omr.sh`** no servidor de prod |
 | `deploy/subir_redis.sh` | Sobe um Redis leve na rede (**homol não tem Redis hoje**) | **copiar pra `~/subir_redis.sh`** e rodar 1x |
 | `deploy/.env.omr.example` | Template das envs do ms-omr | **preencher → `~/env/.env.omr`** no servidor |
 | `deploy/README.md` | Este guia | repo ms-omr |
@@ -31,14 +34,14 @@ também** (fila de respostas disparada pelo callback do cartão). Solução: `su
 chmod +x ~/subir_redis.sh && ~/subir_redis.sh
 ```
 
-### 2. RAM (homol é pequena de propósito)
-Homol (~954MB, 2 vCPU) é enxuto e serve pra **teste leve**. Com `OMR_MAX_WORKERS=1` + os limites
-conservadores do `subir_ms_omr.sh` (450m / 900m swap), roda um cartão por vez; se um pico do
-opencv apertar, o swap (2GB) segura. **Não precisa upgradear homol.**
+### 2. Em homol o gargalo é CPU, não RAM
+Homol tem 4GB (folga de sobra pro opencv) mas **1 vCPU só**, dividido com api/ms-simulado/redis.
+O OMR é CPU-bound: sem limite, uma leitura monopoliza o núcleo e a API engasga junto. Daí
+`--cpus 0.75` + `--memory 1g` no `subir_ms_omr.sh`, e `OMR_MAX_WORKERS=1` no `.env.omr`
+(1 núcleo → não adianta paralelizar).
 
-**Produção (2 vCPU / 8GB)** tem folga de sobra. No script de deploy de prod (a montar, junto de um
-`ci-prod.yml` como o do api), dá pra subir o `--memory` do ms-omr bem acima (ex.: 1–2g);
-`OMR_MAX_WORKERS=1` continua adequado (2 núcleos → CPU-bound).
+**Produção (2 vCPU / 8GB)** tem folga maior: `subir_ms_omr.prod.sh` usa `--memory 2g --cpus 1.5`.
+`OMR_MAX_WORKERS=1` continua adequado mesmo lá.
 
 ## Passo a passo no servidor (uma vez)
 
@@ -56,11 +59,20 @@ chmod +x ~/subir_ms_omr.sh
 ```
 Depois disso, cada merge de PR pra `develop` no ms-omr roda o deploy sozinho (PUSH → DEPLOY_HOMOL).
 
-## Secrets do GitHub (repo ms-omr é novo → precisa cadastrar)
+Em **prod** o mesmo passo a passo vale, usando `subir_ms_omr.prod.sh` como `~/subir_ms_omr.sh`;
+o deploy dispara no push de tag (`git tag 1.0.0 && git push origin 1.0.0`).
 
-Mesmos secrets que o repo do api já tem:
-`DOCKER_USER`, `DOCKER_PASSWORD`, `DEPLOY_HOST_HOMOL`, `DEPLOY_USER_HOMOL`, `DEPLOY_PASS_HOMOL`
-(SSH por **senha**, igual ao ms-simulado/api — não por chave).
+## Secrets do GitHub
+
+Mesmos nomes usados por api/ms-simulado/form. SSH por **senha** nos dois ambientes.
+
+| Secret | Homol | Prod |
+|---|:---:|:---:|
+| `DOCKER_USER` / `DOCKER_PASSWORD` | ✅ cadastrado | ✅ (o mesmo) |
+| `DEPLOY_HOST_HOMOL` / `DEPLOY_USER_HOMOL` / `DEPLOY_PASS_HOMOL` | ✅ cadastrado | — |
+| `DEPLOY_HOST_PROD` / `DEPLOY_USER_PROD` / `DEPLOY_PASS_PROD` | — | ⬜ **falta cadastrar** |
+
+> O `ci-prod.yml` só roda em push de tag; até cadastrar os `*_PROD` não dispara nada.
 
 ## Envs a ajustar nos OUTROS projetos (pro fluxo do cartão fechar em homol)
 
