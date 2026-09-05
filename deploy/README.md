@@ -10,8 +10,10 @@ Servidor homol: **Oracle VPS `168.138.157.99`** (user `ubuntu`), **2 vCPU / ~954
 
 | Arquivo | O quê | Vai pra onde |
 |---|---|---|
-| `.github/workflows/ci-homol.yml` | Workflow: **CI** (ruff/black/pytest no PR) → **PUSH** (build+push `vcnafacul/ms-omr:latest`) → **DEPLOY_HOMOL** (SSH roda `subir_ms_omr.sh`) | repo ms-omr |
-| `deploy/subir_ms_omr.sh` | Script de subida do container ms-omr (interno, sem porta publicada) | **copiar pra `~/subir_ms_omr.sh`** no servidor |
+| `.github/workflows/ci-homol.yml` | Workflow de homolog: **CI** (ruff/black/pytest no PR) → **PUSH** (build+push `vcnafacul/ms-omr:latest`) → **DEPLOY_HOMOL** (SSH roda `subir_ms_omr.sh`) | repo ms-omr |
+| `.github/workflows/ci-prod.yml` | Workflow de produção (push de tag `1.2.0`): **BUILD_AND_PUSH** (`:<tag>` + `:stable`) → **DEPLOY_PROD** → **CREATE_RELEASE**. Igual ao `ci-prod.yml` do api/ms-simulado/form | repo ms-omr |
+| `deploy/subir_ms_omr.sh` | Script de subida do container em **homol** (`:latest`, interno, sem porta publicada) | **copiar pra `~/subir_ms_omr.sh`** no servidor de homol |
+| `deploy/subir_ms_omr.prod.sh` | Mesmo script para **prod** (`:stable`, limites maiores) | **copiar pra `~/subir_ms_omr.sh`** no servidor de prod |
 | `deploy/subir_redis.sh` | Sobe um Redis leve na rede (**homol não tem Redis hoje**) | **copiar pra `~/subir_redis.sh`** e rodar 1x |
 | `deploy/.env.omr.example` | Template das envs do ms-omr | **preencher → `~/env/.env.omr`** no servidor |
 | `deploy/README.md` | Este guia | repo ms-omr |
@@ -56,11 +58,20 @@ chmod +x ~/subir_ms_omr.sh
 ```
 Depois disso, cada merge de PR pra `develop` no ms-omr roda o deploy sozinho (PUSH → DEPLOY_HOMOL).
 
-## Secrets do GitHub (repo ms-omr é novo → precisa cadastrar)
+Em **prod** o mesmo passo a passo vale, usando `subir_ms_omr.prod.sh` como `~/subir_ms_omr.sh`;
+o deploy dispara no push de tag (`git tag 1.0.0 && git push origin 1.0.0`).
 
-Mesmos secrets que o repo do api já tem:
-`DOCKER_USER`, `DOCKER_PASSWORD`, `DEPLOY_HOST_HOMOL`, `DEPLOY_USER_HOMOL`, `DEPLOY_PASS_HOMOL`
-(SSH por **senha**, igual ao ms-simulado/api — não por chave).
+## Secrets do GitHub
+
+Mesmos nomes usados por api/ms-simulado/form. SSH por **senha** nos dois ambientes.
+
+| Secret | Homol | Prod |
+|---|:---:|:---:|
+| `DOCKER_USER` / `DOCKER_PASSWORD` | ✅ cadastrado | ✅ (o mesmo) |
+| `DEPLOY_HOST_HOMOL` / `DEPLOY_USER_HOMOL` / `DEPLOY_PASS_HOMOL` | ✅ cadastrado | — |
+| `DEPLOY_HOST_PROD` / `DEPLOY_USER_PROD` / `DEPLOY_PASS_PROD` | — | ⬜ **falta cadastrar** |
+
+> O `ci-prod.yml` só roda em push de tag; até cadastrar os `*_PROD` não dispara nada.
 
 ## Envs a ajustar nos OUTROS projetos (pro fluxo do cartão fechar em homol)
 

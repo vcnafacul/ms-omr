@@ -1,4 +1,4 @@
-#/!bin/bash
+#!/bin/bash
 
 set -e # se der erro, saia!
 

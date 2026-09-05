@@ -1,4 +1,4 @@
-#/!bin/bash
+#!/bin/bash
 
 set -e # se der erro, saia!
 
@@ -11,8 +11,10 @@ nome_image="vcnafacul/ms-omr:latest"
 nome_container="vcnafacul_ms_omr"
 nome_rede="network-vcnafacul"
 
-docker rm -f $nome_container
-docker rmi -f $nome_image
+# `|| true`: no primeiro deploy o container/imagem ainda não existem e o `set -e`
+# abortaria o script antes do `docker run` (visto no run #33983635736: `No such image`).
+docker rm -f $nome_container || true
+docker rmi -f $nome_image || true
 
 if docker network inspect $nome_rede >/dev/null 2>&1; then
 	echo "A rede $nome_rede existe."
