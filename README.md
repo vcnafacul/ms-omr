@@ -54,3 +54,31 @@ conhece).
 
 O teste de integração (`tests/test_omr_engine.py`, marca `integration`) roda o OMRChecker de
 verdade contra um sample vendorizado.
+
+## Códigos de falha (contrato com o ms-simulado)
+
+Quando a leitura não conclui, o ms-omr faz `POST` no callback com
+`{"imageKey": "...", "falha": {"motivo": "<código>", "detalhe": "<texto cru>"}}`.
+
+Fonte única: `app/codigos.py` (`CodigoFalha`). Esta tabela é derivada dele — ao acrescentar um
+código, atualize os dois.
+
+| código | o que aconteceu | classe |
+|---|---|---|
+| `imagem_nao_encontrada` | o objeto não existe no bucket | negócio |
+| `template_ausente` | o template do simulado não está publicado | negócio |
+| `cartao_nao_detectado` | o OMRChecker rodou e não gerou CSV de Results — não achou o cartão na foto | negócio |
+| `leitura_ausente` | o CSV existe, mas sem a linha desta imagem | negócio |
+| `motor_falhou` | o OMRChecker saiu com código ≠ 0 (o `detalhe` traz o `stderr`) | negócio |
+| `motor_timeout` | o OMRChecker excedeu o tempo, e as re-tentativas se esgotaram | transitório esgotado |
+| `armazenamento_indisponivel` | falha de conexão/credencial no storage, e as re-tentativas se esgotaram | transitório esgotado |
+
+**Negócio** é determinístico: vira callback na hora, re-tentar daria o mesmo resultado.
+
+**Transitório esgotado** é o oposto — a falha é intermitente, o job foi re-tentado até
+`OMR_MAX_TRIES` (default 3, backoff linear de 30s) e só então o callback foi enviado. Ou seja:
+**quando um desses códigos chega, não haverá mais nenhuma tentativa automática.** Uma mensagem do
+tipo "tentaremos de novo" seria falsa aqui.
+
+⚠️ Um código desconhecido pelo consumidor não pode virar tela em branco: o ms-simulado precisa de
+um caso padrão que mostre algo útil e registre o código não mapeado no log.
