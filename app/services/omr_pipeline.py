@@ -25,7 +25,7 @@ def _ler_respostas(image_key: str) -> list[dict]:
         try:
             leitura = ler_cartao(image_key, image, tpl_dir)
         except OmrEngineError as exc:
-            raise FalhaNegocio("cartao_ilegivel", str(exc)) from exc
+            raise FalhaNegocio(exc.codigo, exc.detalhe) from exc
         return [r.model_dump() for r in leitura.respostas]
     finally:
         if tpl_dir is not None:

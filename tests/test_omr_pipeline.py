@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.codigos import CodigoFalha
 from app.services import omr_pipeline as pipe
 from app.services.bucket_storage import StorageError, StorageNotFound
 from app.services.omr_engine import OmrEngineError
@@ -44,13 +45,23 @@ async def test_sucesso_callback_ok(monkeypatch):
     assert calls["falha"] == []
 
 
-async def test_ilegivel_callback_falha_sem_reraise(monkeypatch):
+@pytest.mark.parametrize(
+    "codigo",
+    [
+        CodigoFalha.CARTAO_NAO_DETECTADO,
+        CodigoFalha.LEITURA_AUSENTE,
+        CodigoFalha.MOTOR_FALHOU,
+    ],
+)
+async def test_falha_do_motor_vira_callback_com_o_codigo_e_o_detalhe(monkeypatch, codigo):
     def boom(k, i, t):
-        raise OmrEngineError("sem markers")
+        raise OmrEngineError(codigo, "detalhe cru do motor")
 
     calls = _patch(monkeypatch, ler_cartao=boom)
     await pipe.process_cartao(None, "cartoes/665/a")  # não re-raise
-    assert calls["falha"][0][1] == "cartao_ilegivel"
+
+    assert calls["falha"] == [("cartoes/665/a", codigo, "detalhe cru do motor")]
+    assert calls["ok"] == []
 
 
 async def test_imagem_ausente_callback_falha(monkeypatch):
