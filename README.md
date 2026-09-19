@@ -72,7 +72,7 @@ código, atualize os dois.
 | `motor_falhou` | o OMRChecker saiu com código ≠ 0 (o `detalhe` traz o `stderr`) | negócio |
 | `motor_timeout` | o OMRChecker excedeu o tempo, e as re-tentativas se esgotaram | transitório esgotado |
 | `armazenamento_indisponivel` | falha de conexão/credencial no storage, e as re-tentativas se esgotaram | transitório esgotado |
-| `erro_interno` | falha inesperada no processamento (disco, validação, timeout do próprio job), e as re-tentativas se esgotaram | transitório esgotado |
+| `erro_interno` | falha inesperada no processamento (disco cheio, erro de validação), e as re-tentativas se esgotaram | transitório esgotado |
 
 **Negócio** é determinístico: vira callback na hora, re-tentar daria o mesmo resultado.
 
@@ -81,10 +81,16 @@ código, atualize os dois.
 **quando um desses códigos chega, não haverá mais nenhuma tentativa automática.** Uma mensagem do
 tipo "tentaremos de novo" seria falsa aqui.
 
-⚠️ Se nem o POST do callback conseguir ser entregue, o job é re-tentado e, esgotado, o ms-omr
-apenas registra no log — ele nunca inventa um status de falha para um cartão que pode ter sido
-lido com sucesso. Nesse caso o histórico permanece em `awaiting_omr`, e é o único desfecho em
-que isso acontece.
+⚠️ Dois desfechos não geram callback nenhum, e o histórico do ms-simulado fica em `awaiting_omr`
+até a varredura periódica resgatá-lo:
+
+- **O POST do callback não foi entregue nas três tentativas.** O ms-omr apenas registra no log —
+  nunca inventa um status de falha para um cartão que pode ter sido lido com sucesso.
+- **O `job_timeout` do arq (180s) estourou.** Ele nasce no `asyncio.wait_for` do próprio arq, fora
+  da coroutine do pipeline, então o pipeline não tem como convertê-lo em callback. Manter o
+  orçamento interno abaixo dos 180s é o que evita isso: hoje o subprocess do OMRChecker são 120s e
+  o boto3 está sem timeout explícito (padrão 60s de connect + 60s de read, com re-tentativas
+  próprias), então uma leitura de storage lenta o bastante alcança esse limite.
 
 ⚠️ Um código desconhecido pelo consumidor não pode virar tela em branco: o ms-simulado precisa de
 um caso padrão que mostre algo útil e registre o código não mapeado no log.

@@ -106,6 +106,16 @@ async def process_cartao(ctx, image_key: str) -> None:
     de negócio vira `Retry` enquanto houver tentativa, e na última vira callback
     definitivo: o arq descarta o job sem executá-lo quando job_try > max_tries
     (arq/worker.py:550), então a última tentativa é a última chance de avisar.
+
+    ⚠️ Duas saídas ficam fora deste alcance, por construção:
+    - o `job_timeout` do arq (worker.py:9, 180s). Ele nasce no `asyncio.wait_for` do próprio
+      arq, fora desta coroutine: aqui chega um `CancelledError`, que é BaseException e NÃO é
+      capturado (suprimi-lo seria pior), e o `TimeoutError` que o arq enxerga cai no `else`
+      dele. Mitigar exige manter o orçamento interno abaixo dos 180s — hoje o subprocess são
+      120s e o boto3 está sem timeout explícito. Ver o spec.
+    - o POST do callback falhando nas três tentativas; aí `_retry_ou_desistir` só loga.
+
+    Nos dois casos o histórico fica em `awaiting_omr` até a varredura periódica (card próprio).
     """
     loop = asyncio.get_running_loop()
     try:
@@ -113,8 +123,8 @@ async def process_cartao(ctx, image_key: str) -> None:
     except FalhaNegocio as fn:
         await _entregar_falha(ctx, image_key, fn.motivo, fn.detalhe)
     except Exception as exc:
-        # Leitura falhou por algo transitório ou inesperado (inclusive o TimeoutError do
-        # job_timeout do arq, e OSError/ValidationError, que antes matavam o job calado).
+        # Leitura falhou por algo transitório ou inesperado — OSError de disco cheio,
+        # ValidationError, o que for. Antes disso tudo matava o job calado.
         if _tem_tentativa_sobrando(ctx):
             raise Retry(defer=_tentativa(ctx) * _BACKOFF_SEGUNDOS) from exc
         await _entregar_falha(ctx, image_key, _codigo_transitorio(exc), str(exc))

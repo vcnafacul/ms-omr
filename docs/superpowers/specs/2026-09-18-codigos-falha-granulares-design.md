@@ -198,6 +198,14 @@ tinha **mais três entradas** além do timeout e do `StorageError`:
    `CancelledError`, e cai no mesmo `else`. Como o botocore está em 60s de connect + 60s de read
    dentro de um orçamento de 180s, um incidente de storage **lento** caía na morte silenciosa
    enquanto só um **rápido** alcançava o `Retry`.
+
+   ⚠️ **Este não foi corrigido, e não dá para corrigi-lo de dentro do pipeline.** Verifiquei
+   experimentalmente: o `TimeoutError` nasce no `asyncio.wait_for` do arq, num frame que não é
+   nosso; dentro da coroutine chega um `CancelledError`, que é `BaseException` e não é capturado
+   pelo `except Exception` — e suprimi-lo seria pior do que o problema. A mitigação real é manter
+   o orçamento interno abaixo dos 180s: dar timeouts explícitos e `max_attempts` ao boto3 em
+   `bucket_storage.py`, e conferir a soma contra o `_TIMEOUT_SECONDS` de 120s do subprocess.
+   **Card próprio** — é configuração de storage, não contrato de códigos de falha.
 3. **Qualquer exceção não classificada** — `OSError` de disco cheio, `ValidationError`,
    o `ValueError` de `parse_simulado_id`.
 
@@ -212,9 +220,9 @@ A correção distingue duas fases, porque elas terminam diferente:
 
 Isso acrescenta um oitavo código, `erro_interno`, para o inesperado.
 
-⚠️ Um desfecho permanece sem callback, e agora é o único: quando nem o POST consegue ser entregue
-após as três tentativas. O histórico fica em `awaiting_omr` e só a varredura periódica (card
-próprio) o resgata.
+⚠️ Dois desfechos permanecem sem callback: o POST não entregue nas três tentativas, e o
+`job_timeout` do arq (acima). Nos dois o histórico fica em `awaiting_omr` e só a varredura
+periódica (card próprio) o resgata.
 
 ## Fora de escopo
 
