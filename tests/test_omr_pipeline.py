@@ -72,7 +72,7 @@ async def test_imagem_ausente_callback_falha(monkeypatch):
 
     calls = _patch(monkeypatch, obter_imagem=boom)
     await pipe.process_cartao(None, "cartoes/665/a")
-    assert calls["falha"][0][1] == "imagem_nao_encontrada"
+    assert calls["falha"][0][1] == CodigoFalha.IMAGEM_NAO_ENCONTRADA
 
 
 _TRANSITORIOS = [

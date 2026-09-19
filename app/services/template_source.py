@@ -2,6 +2,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from app.codigos import CodigoFalha
 from app.errors import FalhaNegocio
 from app.services.bucket_storage import StorageNotFound, baixar_imagem
 from app.services.image_cache import cache_get, cache_set
@@ -17,7 +18,7 @@ def _baixar_texto(key: str) -> bytes:
     try:
         data = baixar_imagem(key)  # get genérico por key (Card 05)
     except StorageNotFound as exc:
-        raise FalhaNegocio("template_ausente", str(exc)) from exc
+        raise FalhaNegocio(CodigoFalha.TEMPLATE_AUSENTE, str(exc)) from exc
     cache_set(key, data, _TPL_PREFIX)
     return data
 

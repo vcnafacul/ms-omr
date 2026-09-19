@@ -27,7 +27,7 @@ def _ler_respostas(image_key: str) -> list[dict]:
         try:
             image = obter_imagem(image_key)
         except StorageNotFound as exc:
-            raise FalhaNegocio("imagem_nao_encontrada", str(exc)) from exc
+            raise FalhaNegocio(CodigoFalha.IMAGEM_NAO_ENCONTRADA, str(exc)) from exc
         tpl_dir = obter_template(simulado_id)
         try:
             leitura = ler_cartao(image_key, image, tpl_dir)
