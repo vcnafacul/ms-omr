@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # Worker in-process (Opção A)
     omr_max_workers: int = Field(default_factory=lambda: max(1, (os.cpu_count() or 2) - 1))
     omr_inprocess_worker: bool = True
+    # Teto de tentativas do arq. Lido pelo worker E pelo pipeline (que decide, na última
+    # tentativa, converter o transitório em callback definitivo). Uma definição só.
+    omr_max_tries: int = 3
 
 
 @lru_cache

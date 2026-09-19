@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from app.codigos import CodigoFalha
 from app.errors import FalhaNegocio
 from app.services import template_source as ts
 from app.services.bucket_storage import StorageNotFound
@@ -45,4 +46,4 @@ def test_template_ausente_vira_falha_negocio(monkeypatch):
     monkeypatch.setattr(ts, "cache_set", lambda k, d, p: None)
     with pytest.raises(FalhaNegocio) as ei:
         ts.obter_template("665abc")
-    assert ei.value.motivo == "template_ausente"
+    assert ei.value.motivo == CodigoFalha.TEMPLATE_AUSENTE

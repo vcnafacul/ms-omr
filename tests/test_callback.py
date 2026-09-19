@@ -1,5 +1,6 @@
 import httpx
 
+from app.codigos import CodigoFalha
 from app.services import callback
 
 
@@ -41,9 +42,11 @@ async def test_ok_monta_payload(monkeypatch):
 async def test_falha_monta_payload(monkeypatch):
     FakeClient.posted = []
     monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
-    await callback.enviar_resultado_falha("cartoes/1/a", "cartao_ilegivel", "sem markers")
+    await callback.enviar_resultado_falha(
+        "cartoes/1/a", CodigoFalha.CARTAO_NAO_DETECTADO, "sem markers"
+    )
     _, body = FakeClient.posted[0]
     assert body == {
         "imageKey": "cartoes/1/a",
-        "falha": {"motivo": "cartao_ilegivel", "detalhe": "sem markers"},
+        "falha": {"motivo": "cartao_nao_detectado", "detalhe": "sem markers"},
     }
