@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import shutil
 
 from arq import Retry
@@ -14,8 +15,36 @@ from app.services.imagekey import parse_simulado_id
 from app.services.omr_engine import OmrEngineError, OmrTimeout
 from app.services.template_source import obter_template
 
+logger = logging.getLogger(__name__)
+
 # Espera entre tentativas de um transitório: job_try × isto. Backoff linear (30s, 60s).
 _BACKOFF_SEGUNDOS = 30
+
+# Transitório conhecido → código definitivo quando as tentativas se esgotam.
+# Lista explícita, e não uma classe-base marcadora: StorageNotFound herda de StorageError
+# e é falha de NEGÓCIO (convertida em _ler_respostas). Marcar por herança o tornaria
+# transitório sem ninguém perceber.
+_CODIGO_POR_TRANSITORIO: dict[type[Exception], CodigoFalha] = {
+    OmrTimeout: CodigoFalha.MOTOR_TIMEOUT,
+    StorageError: CodigoFalha.ARMAZENAMENTO_INDISPONIVEL,
+}
+
+
+def _tentativa(ctx) -> int:
+    """Nº da tentativa atual. O arq sempre entrega um ctx com `job_try` — o default
+    existe para um chamador fora do worker, e erra para o lado seguro (mais tentativas)."""
+    return (ctx or {}).get("job_try", 1)
+
+
+def _tem_tentativa_sobrando(ctx) -> bool:
+    return _tentativa(ctx) < get_settings().omr_max_tries
+
+
+def _codigo_transitorio(exc: Exception) -> CodigoFalha:
+    for tipo, codigo in _CODIGO_POR_TRANSITORIO.items():
+        if isinstance(exc, tipo):
+            return codigo
+    return CodigoFalha.ERRO_INTERNO
 
 
 def _ler_respostas(image_key: str) -> list[dict]:
@@ -39,33 +68,55 @@ def _ler_respostas(image_key: str) -> list[dict]:
             shutil.rmtree(tpl_dir, ignore_errors=True)
 
 
+async def _entregar_ok(ctx, image_key: str, respostas: list[dict]) -> None:
+    try:
+        await callback.enviar_resultado_ok(image_key, respostas)
+    except Exception as exc:
+        _retry_ou_desistir(ctx, image_key, exc)
+
+
+async def _entregar_falha(ctx, image_key: str, motivo: CodigoFalha, detalhe: str | None) -> None:
+    try:
+        await callback.enviar_resultado_falha(image_key, motivo, detalhe)
+    except Exception as exc:
+        _retry_ou_desistir(ctx, image_key, exc)
+
+
+def _retry_ou_desistir(ctx, image_key: str, exc: Exception) -> None:
+    """O POST do callback falhou. Re-tenta o job inteiro enquanto houver tentativa — relê
+    o cartão, o que é caro mas correto. Esgotado, só resta logar: inventar um status aqui
+    marcaria como falho um cartão que pode ter sido lido com sucesso."""
+    if _tem_tentativa_sobrando(ctx):
+        raise Retry(defer=_tentativa(ctx) * _BACKOFF_SEGUNDOS) from exc
+    logger.error(
+        "callback de %s não entregue após %d tentativas; histórico segue em awaiting_omr: %s",
+        image_key,
+        get_settings().omr_max_tries,
+        exc,
+    )
+
+
 async def process_cartao(ctx, image_key: str) -> None:
     """Task do worker arq (roda in-process). O OMR bloqueante vai pra um thread
     (run_in_executor) → concorrência real até OMR_MAX_WORKERS sem travar a API.
 
-    Falha de negócio → callback `falha`, sem re-raise.
-    Transitório → `Retry` explícito: o arq NÃO re-tenta exceção comum, só Retry,
-    CancelledError e RetryJob (arq/worker.py:610-634). Na última tentativa permitida
-    vira callback definitivo, porque o arq descarta o job sem executá-lo quando
-    job_try > max_tries (arq/worker.py:550) — seria a última chance de avisar.
+    Nenhum caminho pode terminar sem callback: o histórico do ms-simulado fica em
+    `awaiting_omr` até um chegar, e o arq NÃO re-tenta exceção comum — só Retry,
+    CancelledError e RetryJob (arq/worker.py:610-634). Por isso tudo que não é falha
+    de negócio vira `Retry` enquanto houver tentativa, e na última vira callback
+    definitivo: o arq descarta o job sem executá-lo quando job_try > max_tries
+    (arq/worker.py:550), então a última tentativa é a última chance de avisar.
     """
     loop = asyncio.get_running_loop()
     try:
         respostas = await loop.run_in_executor(None, _ler_respostas, image_key)
-        await callback.enviar_resultado_ok(image_key, respostas)
     except FalhaNegocio as fn:
-        await callback.enviar_resultado_falha(image_key, fn.motivo, fn.detalhe)
-    except (OmrTimeout, StorageError) as exc:
-        # Lista explícita, e não uma classe-base marcadora: StorageNotFound herda de
-        # StorageError e é falha de NEGÓCIO (convertida acima). Marcar por herança o
-        # tornaria transitório sem ninguém perceber.
-        codigo = (
-            CodigoFalha.MOTOR_TIMEOUT
-            if isinstance(exc, OmrTimeout)
-            else CodigoFalha.ARMAZENAMENTO_INDISPONIVEL
-        )
-        tentativa = (ctx or {}).get("job_try", 1)
-        if tentativa >= get_settings().omr_max_tries:
-            await callback.enviar_resultado_falha(image_key, codigo, str(exc))
-            return
-        raise Retry(defer=tentativa * _BACKOFF_SEGUNDOS) from exc
+        await _entregar_falha(ctx, image_key, fn.motivo, fn.detalhe)
+    except Exception as exc:
+        # Leitura falhou por algo transitório ou inesperado (inclusive o TimeoutError do
+        # job_timeout do arq, e OSError/ValidationError, que antes matavam o job calado).
+        if _tem_tentativa_sobrando(ctx):
+            raise Retry(defer=_tentativa(ctx) * _BACKOFF_SEGUNDOS) from exc
+        await _entregar_falha(ctx, image_key, _codigo_transitorio(exc), str(exc))
+    else:
+        await _entregar_ok(ctx, image_key, respostas)

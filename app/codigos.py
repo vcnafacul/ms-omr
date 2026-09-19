@@ -18,3 +18,6 @@ class CodigoFalha(StrEnum):
     # Transitórios: re-tentados pelo arq; só viram callback quando as tentativas se esgotam.
     MOTOR_TIMEOUT = "motor_timeout"
     ARMAZENAMENTO_INDISPONIVEL = "armazenamento_indisponivel"
+    # Fallback para falha não classificada — disco cheio, erro de validação, o próprio
+    # job_timeout do arq. Também re-tentado; só reportado quando as tentativas se esgotam.
+    ERRO_INTERNO = "erro_interno"

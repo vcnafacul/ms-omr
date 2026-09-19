@@ -72,6 +72,7 @@ código, atualize os dois.
 | `motor_falhou` | o OMRChecker saiu com código ≠ 0 (o `detalhe` traz o `stderr`) | negócio |
 | `motor_timeout` | o OMRChecker excedeu o tempo, e as re-tentativas se esgotaram | transitório esgotado |
 | `armazenamento_indisponivel` | falha de conexão/credencial no storage, e as re-tentativas se esgotaram | transitório esgotado |
+| `erro_interno` | falha inesperada no processamento (disco, validação, timeout do próprio job), e as re-tentativas se esgotaram | transitório esgotado |
 
 **Negócio** é determinístico: vira callback na hora, re-tentar daria o mesmo resultado.
 
@@ -79,6 +80,11 @@ código, atualize os dois.
 `OMR_MAX_TRIES` (default 3, backoff linear de 30s) e só então o callback foi enviado. Ou seja:
 **quando um desses códigos chega, não haverá mais nenhuma tentativa automática.** Uma mensagem do
 tipo "tentaremos de novo" seria falsa aqui.
+
+⚠️ Se nem o POST do callback conseguir ser entregue, o job é re-tentado e, esgotado, o ms-omr
+apenas registra no log — ele nunca inventa um status de falha para um cartão que pode ter sido
+lido com sucesso. Nesse caso o histórico permanece em `awaiting_omr`, e é o único desfecho em
+que isso acontece.
 
 ⚠️ Um código desconhecido pelo consumidor não pode virar tela em branco: o ms-simulado precisa de
 um caso padrão que mostre algo útil e registre o código não mapeado no log.

@@ -9,7 +9,8 @@ async def _post(payload: dict) -> None:
     url = get_settings().callback_url
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.post(url, json=payload)
-        resp.raise_for_status()  # 4xx/5xx → HTTPStatusError (transitório → arq re-tenta)
+        # 4xx/5xx → HTTPStatusError; quem re-tenta é o pipeline, via arq.Retry
+        resp.raise_for_status()
 
 
 async def enviar_resultado_ok(image_key: str, respostas: list[dict]) -> None:

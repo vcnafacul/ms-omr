@@ -10,10 +10,11 @@ _ESPERADOS = {
     "motor_falhou",
     "motor_timeout",
     "armazenamento_indisponivel",
+    "erro_interno",
 }
 
 
-def test_catalogo_tem_exatamente_os_sete_codigos_do_contrato():
+def test_catalogo_tem_exatamente_os_oito_codigos_do_contrato():
     assert {c.value for c in CodigoFalha} == _ESPERADOS
 
 

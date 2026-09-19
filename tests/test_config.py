@@ -12,8 +12,8 @@ def test_teto_de_tentativas_tem_default_3():
     assert Settings.model_fields["omr_max_tries"].default == 3
 
 
-def test_worker_e_pipeline_leem_o_mesmo_teto_de_tentativas():
+def test_worker_le_o_teto_do_settings():
     from app.config import get_settings
     from app.worker import WorkerSettings
 
-    assert WorkerSettings.max_tries == get_settings().omr_max_tries
+    assert WorkerSettings.max_tries == get_settings().omr_max_tries == 3

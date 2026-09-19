@@ -184,19 +184,59 @@ refletir uma falha definitiva.
 ⚠️ O card `01` também precisa acomodar o sétimo código, `armazenamento_indisponivel`, que não estava
 previsto na tabela original.
 
+## Emenda — o escopo cresceu depois da revisão adversarial
+
+A revisão final subiu um worker arq real contra Redis e provou que o buraco da morte silenciosa
+tinha **mais três entradas** além do timeout e do `StorageError`:
+
+1. **O POST do callback.** `callback.py` fazia `raise_for_status()` com o comentário
+   *"transitório → arq re-tenta"* — a mesma crença falsa que este spec abre refutando, deixada em
+   pé sobre o único código capaz de tirar um `Historico` de `awaiting_omr`. Atinge inclusive o
+   caminho de **sucesso**: um cartão lido corretamente tinha o resultado descartado se o
+   ms-simulado devolvesse 502 durante um deploy.
+2. **O `job_timeout` do próprio arq.** `asyncio.wait_for` levanta `TimeoutError`, que não é
+   `CancelledError`, e cai no mesmo `else`. Como o botocore está em 60s de connect + 60s de read
+   dentro de um orçamento de 180s, um incidente de storage **lento** caía na morte silenciosa
+   enquanto só um **rápido** alcançava o `Retry`.
+3. **Qualquer exceção não classificada** — `OSError` de disco cheio, `ValidationError`,
+   o `ValueError` de `parse_simulado_id`.
+
+**Decisão: os três entram**, pelo mesmo raciocínio que trouxe o `StorageError` — e porque sem eles
+o critério de aceite *"nunca em job morto sem aviso"* seria falso.
+
+A correção distingue duas fases, porque elas terminam diferente:
+
+- **Leitura falhou** → esgotadas as tentativas, vira callback de falha. É o objetivo.
+- **Entrega falhou** (o POST) → esgotadas as tentativas, apenas loga. Inventar um status aqui
+  marcaria como falho um cartão que pode ter sido lido com sucesso.
+
+Isso acrescenta um oitavo código, `erro_interno`, para o inesperado.
+
+⚠️ Um desfecho permanece sem callback, e agora é o único: quando nem o POST consegue ser entregue
+após as três tentativas. O histórico fica em `awaiting_omr` e só a varredura periódica (card
+próprio) o resgata.
+
 ## Fora de escopo
 
 - Persistir código, descrição e detalhe no `Historico` — é o card `01`.
-- A varredura periódica de `awaiting_omr` órfãos. Este card fecha o buraco nos caminhos de timeout e
-  storage, mas o processo ainda pode morrer entre o `createAwaitingOmr` e o callback. Card próprio,
-  já previsto no `09`.
+- A varredura periódica de `awaiting_omr` órfãos. Card próprio, já previsto no `09`.
 - Os códigos `imagem_nao_encontrada` e `template_ausente` ficam como estão: já são granulares.
+- **`motor_falhou` ainda junta duas causas.** A revisão rodou o OMRChecker real contra bytes
+  indecodificáveis e obteve exit 1 com `'NoneType' object has no attribute 'shape'` — `cv2.imread`
+  devolvendo `None`, ou seja foto ilegível ("mande outra"), não bug do motor ("fale com o
+  suporte"). Agrava que `_image_suffix` nomeia **todo** payload de bytes como `.png`, então
+  qualquer formato que o OpenCV não decodifique (HEIC de celular é o candidato óbvio) chega aqui.
+  Não é regressão — hoje isso já é um código errado — mas é a mesma classe de defeito que este
+  card existe para eliminar. Card próprio: validar decodificabilidade **antes** de invocar o
+  motor, em vez de casar o `stderr` por regex.
 
 ## Critérios de aceite
 
 - [ ] Cada causa de `OmrEngineError` tem código próprio
 - [ ] Timeout deixa de ser `FalhaNegocio` e passa a re-tentar de fato, via `Retry`
 - [ ] `StorageError` recebe o mesmo tratamento
+- [ ] O POST do callback, o `job_timeout` do arq e o inesperado também (emenda acima)
+- [ ] Falha de entrega esgotada loga, e não inventa um status de falha
 - [ ] Tentativas esgotadas resultam em callback de falha — nunca em job morto sem aviso
 - [ ] `detalhe` continua chegando em todos os casos
 - [ ] `max_tries` tem uma definição só, em `Settings`
