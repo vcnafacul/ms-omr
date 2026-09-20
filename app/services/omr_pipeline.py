@@ -68,16 +68,24 @@ def _ler_respostas(image_key: str) -> list[dict]:
             shutil.rmtree(tpl_dir, ignore_errors=True)
 
 
-async def _entregar_ok(ctx, image_key: str, respostas: list[dict]) -> None:
+async def _entregar_ok(
+    ctx, image_key: str, respostas: list[dict], tentativa_id: str | None = None
+) -> None:
     try:
-        await callback.enviar_resultado_ok(image_key, respostas)
+        await callback.enviar_resultado_ok(image_key, respostas, tentativa_id)
     except Exception as exc:
         _retry_ou_desistir(ctx, image_key, exc)
 
 
-async def _entregar_falha(ctx, image_key: str, motivo: CodigoFalha, detalhe: str | None) -> None:
+async def _entregar_falha(
+    ctx,
+    image_key: str,
+    motivo: CodigoFalha,
+    detalhe: str | None,
+    tentativa_id: str | None = None,
+) -> None:
     try:
-        await callback.enviar_resultado_falha(image_key, motivo, detalhe)
+        await callback.enviar_resultado_falha(image_key, motivo, detalhe, tentativa_id)
     except Exception as exc:
         _retry_ou_desistir(ctx, image_key, exc)
 
@@ -96,7 +104,7 @@ def _retry_ou_desistir(ctx, image_key: str, exc: Exception) -> None:
     )
 
 
-async def process_cartao(ctx, image_key: str) -> None:
+async def process_cartao(ctx, image_key: str, tentativa_id: str | None = None) -> None:
     """Task do worker arq (roda in-process). O OMR bloqueante vai pra um thread
     (run_in_executor) → concorrência real até OMR_MAX_WORKERS sem travar a API.
 
@@ -116,17 +124,22 @@ async def process_cartao(ctx, image_key: str) -> None:
     - o POST do callback falhando nas três tentativas; aí `_retry_ou_desistir` só loga.
 
     Nos dois casos o histórico fica em `awaiting_omr` até a varredura periódica (card próprio).
+
+    ⚠️ `tentativa_id` tem default `None` por obrigação, não por estilo: os jobs já
+    enfileirados no Redis no momento do deploy foram serializados com UM argumento.
+    Exigir dois posicionais os quebraria na execução, e os cartões correspondentes
+    ficariam presos em `awaiting_omr` até a varredura do card 13.
     """
     loop = asyncio.get_running_loop()
     try:
         respostas = await loop.run_in_executor(None, _ler_respostas, image_key)
     except FalhaNegocio as fn:
-        await _entregar_falha(ctx, image_key, fn.motivo, fn.detalhe)
+        await _entregar_falha(ctx, image_key, fn.motivo, fn.detalhe, tentativa_id)
     except Exception as exc:
         # Leitura falhou por algo transitório ou inesperado — OSError de disco cheio,
         # ValidationError, o que for. Antes disso tudo matava o job calado.
         if _tem_tentativa_sobrando(ctx):
             raise Retry(defer=_tentativa(ctx) * _BACKOFF_SEGUNDOS) from exc
-        await _entregar_falha(ctx, image_key, _codigo_transitorio(exc), str(exc))
+        await _entregar_falha(ctx, image_key, _codigo_transitorio(exc), str(exc), tentativa_id)
     else:
-        await _entregar_ok(ctx, image_key, respostas)
+        await _entregar_ok(ctx, image_key, respostas, tentativa_id)

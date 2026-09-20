@@ -18,7 +18,9 @@ def _leitura():
 
 
 def _patch(monkeypatch, **over):
-    calls = {"ok": [], "falha": []}
+    # `token` guarda o tentativa_id de cada entrega separado das tuplas historicas,
+    # para nao mexer nas assercoes de payload que ja existiam.
+    calls = {"ok": [], "falha": [], "token": []}
     monkeypatch.setattr(pipe, "obter_imagem", over.get("obter_imagem", lambda k: b"img"))
     monkeypatch.setattr(
         pipe,
@@ -27,11 +29,13 @@ def _patch(monkeypatch, **over):
     )
     monkeypatch.setattr(pipe, "ler_cartao", over.get("ler_cartao", lambda k, i, t: _leitura()))
 
-    async def ok(k, r):
+    async def ok(k, r, t=None):
         calls["ok"].append((k, r))
+        calls["token"].append(t)
 
-    async def falha(k, m, d=None):
+    async def falha(k, m, d=None, t=None):
         calls["falha"].append((k, m, d))
+        calls["token"].append(t)
 
     monkeypatch.setattr(pipe.callback, "enviar_resultado_ok", ok)
     monkeypatch.setattr(pipe.callback, "enviar_resultado_falha", falha)

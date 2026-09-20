@@ -36,6 +36,7 @@ async def test_ok_monta_payload(monkeypatch):
     assert body == {
         "imageKey": "cartoes/1/a",
         "respostas": [{"questao": "1", "alternativaEstudante": "A"}],
+        "tentativaId": None,
     }
 
 
@@ -49,4 +50,35 @@ async def test_falha_monta_payload(monkeypatch):
     assert body == {
         "imageKey": "cartoes/1/a",
         "falha": {"motivo": "cartao_nao_detectado", "detalhe": "sem markers"},
+        "tentativaId": None,
     }
+
+
+async def test_ok_leva_tentativa_id(monkeypatch):
+    FakeClient.posted = []
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    await callback.enviar_resultado_ok("cartoes/1/a", [], tentativa_id="T1")
+    _, body = FakeClient.posted[0]
+    assert body["tentativaId"] == "T1"
+
+
+async def test_falha_leva_tentativa_id(monkeypatch):
+    FakeClient.posted = []
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    await callback.enviar_resultado_falha(
+        "cartoes/1/a", CodigoFalha.ERRO_INTERNO, "x", tentativa_id="T1"
+    )
+    _, body = FakeClient.posted[0]
+    assert body["tentativaId"] == "T1"
+
+
+async def test_sem_tentativa_id_o_campo_vai_nulo(monkeypatch):
+    # ⚠️ O ms-simulado ACEITA callback sem token (job enfileirado antes do
+    # deploy). O campo ir como None e' o contrato: nao pode sumir do payload
+    # nem virar string vazia, que o `@IsOptional` do outro lado trataria
+    # diferente.
+    FakeClient.posted = []
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    await callback.enviar_resultado_ok("cartoes/1/a", [])
+    _, body = FakeClient.posted[0]
+    assert body["tentativaId"] is None
