@@ -1,7 +1,49 @@
 # ms-omr
 
-Microserviço de OMR (leitura de cartão-resposta) — Python + FastAPI.
-Stateless: recebe `imageR2Key`, baixa do R2, lê o cartão e devolve JSON.
+Microserviço de OMR (*optical mark recognition*) do **Você na Facul** — Python 3.11 + FastAPI.
+
+Recebe a chave de uma foto de cartão-resposta preenchido à mão, baixa a imagem do storage, lê as
+marcações com o [OMRChecker](#omrchecker-engine-de-leitura) e devolve o resultado por callback.
+Stateless: nada é guardado entre requisições.
+
+## Arquitetura
+
+```
+client-vcnafacul  →  api-vcnafacul  →  ms-simulado  →  ms-omr      ← você está aqui
+  (React SPA)       (NestJS gateway)    (provas)       (FastAPI + OMRChecker)
+                                             ↑              ↓
+                                             └─── callback ─┘
+```
+
+| Serviço | Stack | Banco | Porta |
+|---------|-------|-------|-------|
+| **ms-omr** (este) | Python 3.11 + FastAPI | Redis (fila e cache) | `8000` |
+| ms-simulado | NestJS 10 + Mongoose | MongoDB | `3000` |
+| api-vcnafacul | NestJS 10 + TypeORM | MySQL 8+ | `3333` |
+| vcnafacul-form | NestJS 11 + Mongoose | MongoDB | `3001` |
+| client-vcnafacul | React 19 + Vite 6 | — | `5173` |
+
+Quem chama o ms-omr é o `ms-simulado` — nunca o frontend. O serviço não é exposto ao público.
+
+## Fluxo de uma leitura
+
+1. `POST /omr/process` com `{"imageKey": "..."}` responde `202` na hora e enfileira o job (arq + Redis)
+2. o worker baixa a imagem do bucket (S3 / Cloudflare R2 / MinIO local), com cache no Redis
+3. o OMRChecker lê o cartão usando o `template.json` da versão correspondente
+4. o resultado vai por `POST` na `CALLBACK_URL` (o `ms-simulado`, em `v1/cartao-resposta/callback`):
+   - sucesso → `{"imageKey": "...", "respostas": [...]}`
+   - falha → `{"imageKey": "...", "falha": {"motivo": "<código>", "detalhe": "..."}}`
+
+Falhas transitórias são re-tentadas pelo arq até `OMR_MAX_TRIES` (default 3, backoff linear de 30s)
+antes de virarem callback. Ver [códigos de falha](#códigos-de-falha-contrato-com-o-ms-simulado).
+
+## Endpoints
+
+| método | rota | o que faz |
+|---|---|---|
+| `GET` | `/health` | liveness — `{"status": "ok"}` |
+| `POST` | `/omr/process` | enfileira a leitura de um `imageKey`; `202` = aceito, não lido ainda |
+| `GET` | `/docs` | Swagger |
 
 ## Rodar local (standalone)
 
@@ -21,10 +63,11 @@ make logs    # acompanha os logs do container
 make down    # para e remove o container
 ```
 
-## Rodar via monorepo
+## Rodar junto dos outros serviços
 
-`../dev.sh` sobe o ms-omr junto dos demais serviços (porta 8000).
-`../dev.sh stop` encerra tudo.
+No workspace de desenvolvimento do time (os repositórios clonados lado a lado), `../dev.sh` sobe o
+ms-omr junto dos demais — incluindo o MinIO e o Redis de que ele depende — e `../dev.sh stop`
+encerra tudo. O script não faz parte deste repositório.
 
 ## Qualidade
 
@@ -33,6 +76,31 @@ uv run ruff check .
 uv run black --check .
 uv run pytest
 ```
+
+## Configuração
+
+Variáveis lidas por `app/config.py` (via `.env`). O `.env.example` traz só o subconjunto
+necessário para rodar local:
+
+| variável | default | para que serve |
+|---|---|---|
+| `OMR_PORT` | `8000` | porta do serviço |
+| `LOG_LEVEL` | `INFO` | nível de log |
+| `TEMPLATE_DIR` | `templates` | raiz dos templates versionados |
+| `OMR_BUCKET` | `vcnafacul-cartoes` | bucket das fotos de cartão |
+| `AWS_ENDPOINT` / `AWS_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | — | storage (R2 em produção, MinIO local) |
+| `REDIS_URL` | — | fila (arq) e cache das imagens |
+| `OMR_CACHE_TTL_SECONDS` | `3600` | validade do cache da imagem |
+| `CALLBACK_URL` | — | endpoint do `ms-simulado` que recebe o resultado |
+| `OMR_MAX_TRIES` | `3` | tentativas antes de desistir de uma falha transitória |
+| `OMR_MAX_WORKERS` | `nproc - 1` | leituras simultâneas |
+| `OMR_INPROCESS_WORKER` | `true` | roda o worker arq dentro do processo da API |
+
+## Deploy
+
+- `ci-homol.yml` — no merge de um PR em `develop`: builda a imagem, publica no Docker Hub e sobe em
+  homologação. Antes de publicar, roda um smoke do motor OMR dentro da imagem.
+- `ci-prod.yml` — deploy em produção.
 
 ## OMRChecker (engine de leitura)
 
