@@ -9,6 +9,9 @@ router = APIRouter(tags=["omr"])
 
 class ProcessIn(BaseModel):
     imageKey: str
+    # ⚠️ Opcional de propósito: o ms-simulado ainda não implantado não manda o
+    # campo, e recusar aqui prenderia todo cartão do período em `awaiting_omr`.
+    tentativaId: str | None = None
 
 
 @router.post("/omr/process", status_code=202)
@@ -18,5 +21,5 @@ async def process(body: ProcessIn, request: Request) -> dict:
     pool = getattr(request.app.state, "arq_pool", None)
     if pool is None:
         raise HTTPException(status_code=503, detail="fila indisponível")
-    await enfileirar(pool, body.imageKey)
+    await enfileirar(pool, body.imageKey, body.tentativaId)
     return {"status": "enqueued", "imageKey": body.imageKey}

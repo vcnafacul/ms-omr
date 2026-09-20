@@ -15,5 +15,5 @@ async def criar_pool():
     return await create_pool(_redis_settings())
 
 
-async def enfileirar(pool, image_key: str):
-    return await pool.enqueue_job(_QUEUE_FUNC, image_key)
+async def enfileirar(pool, image_key: str, tentativa_id: str | None = None):
+    return await pool.enqueue_job(_QUEUE_FUNC, image_key, tentativa_id)

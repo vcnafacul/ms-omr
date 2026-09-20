@@ -18,7 +18,9 @@ def _leitura():
 
 
 def _patch(monkeypatch, **over):
-    calls = {"ok": [], "falha": []}
+    # `token` guarda o tentativa_id de cada entrega separado das tuplas historicas,
+    # para nao mexer nas assercoes de payload que ja existiam.
+    calls = {"ok": [], "falha": [], "token": []}
     monkeypatch.setattr(pipe, "obter_imagem", over.get("obter_imagem", lambda k: b"img"))
     monkeypatch.setattr(
         pipe,
@@ -27,11 +29,13 @@ def _patch(monkeypatch, **over):
     )
     monkeypatch.setattr(pipe, "ler_cartao", over.get("ler_cartao", lambda k, i, t: _leitura()))
 
-    async def ok(k, r):
+    async def ok(k, r, t=None):
         calls["ok"].append((k, r))
+        calls["token"].append(t)
 
-    async def falha(k, m, d=None):
+    async def falha(k, m, d=None, t=None):
         calls["falha"].append((k, m, d))
+        calls["token"].append(t)
 
     monkeypatch.setattr(pipe.callback, "enviar_resultado_ok", ok)
     monkeypatch.setattr(pipe.callback, "enviar_resultado_falha", falha)
@@ -201,3 +205,49 @@ async def test_pipeline_honra_o_teto_configurado(monkeypatch):
 
     await pipe.process_cartao({"job_try": 1}, "cartoes/665/a")  # não levanta Retry
     assert calls["falha"][0][1] == CodigoFalha.MOTOR_TIMEOUT
+
+
+async def test_job_antigo_sem_tentativa_id_ainda_roda(monkeypatch):
+    # ⚠️ Os jobs ja enfileirados no Redis no momento do deploy foram
+    # serializados com UM argumento. Se `process_cartao` exigisse dois
+    # posicionais, eles quebrariam ao executar e os cartoes ficariam presos em
+    # `awaiting_omr` ate a varredura do card 13 — uma hora depois.
+    import inspect
+
+    from app.services.omr_pipeline import process_cartao
+
+    sig = inspect.signature(process_cartao)
+    assert sig.parameters["tentativa_id"].default is None
+
+    # e a chamada com DOIS argumentos, do jeito que o job velho e' desserializado,
+    # roda ate o fim e entrega o callback com o token nulo
+    calls = _patch(monkeypatch)
+    await process_cartao(None, "cartoes/665/a")
+    assert calls["ok"] == [("cartoes/665/a", [{"questao": "1", "alternativaEstudante": "A"}])]
+    assert calls["token"] == [None]
+
+
+async def test_token_chega_no_callback_de_sucesso(monkeypatch):
+    calls = _patch(monkeypatch)
+    await pipe.process_cartao(None, "cartoes/665/a", "T1")
+    assert calls["token"] == ["T1"]
+
+
+async def test_token_chega_no_callback_de_falha_de_negocio(monkeypatch):
+    def boom(k, i, t):
+        raise OmrEngineError(CodigoFalha.CARTAO_NAO_DETECTADO, "sem markers")
+
+    calls = _patch(monkeypatch, ler_cartao=boom)
+    await pipe.process_cartao({"job_try": 1}, "cartoes/665/a", "T1")
+    assert calls["token"] == ["T1"]
+
+
+async def test_token_chega_no_callback_de_transitorio_esgotado(monkeypatch):
+    # o caminho do _codigo_transitorio: ultima tentativa, callback definitivo.
+    # Sem o token aqui, o ms-simulado aceitaria em silencio uma falha velha.
+    def boom(*a, **k):
+        raise OmrTimeout("OMRChecker excedeu 120s")
+
+    calls = _patch(monkeypatch, ler_cartao=boom)
+    await pipe.process_cartao({"job_try": 3}, "cartoes/665/a", "T1")
+    assert calls["token"] == ["T1"]
