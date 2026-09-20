@@ -9,7 +9,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Roda em cada push do PR: lint + format + testes unitários (sem OMRChecker/opencv).
+  # Roda em cada push do PR: lint + format + testes rápidos (marker "not integration").
+  # Roda em runner headless, que é exatamente onde o motor OMR quebrava — ver tests/test_headless.py.
   CI:
     if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened')
     runs-on: ubuntu-latest
@@ -39,6 +40,12 @@ jobs:
           fetch-depth: 0
       - name: Build Docker image
         run: docker build -t vcnafacul/ms-omr:latest -f omr.dockerfile .
+      # a imagem não pode subir com o motor quebrado: no container não há X11/DRM nem display,
+      # e o OMRChecker morria no import (screeninfo). Smoke barato, antes de publicar.
+      - name: Smoke do motor OMR na imagem (headless)
+        run: |
+          docker run --rm --workdir /app/vendor/omrchecker vcnafacul/ms-omr:latest \
+            python -c "import src.entry; print('motor OMR importa headless')"
       - name: Docker login
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
       - name: Push Docker image

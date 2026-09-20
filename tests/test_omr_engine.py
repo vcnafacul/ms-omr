@@ -14,8 +14,14 @@ _SAMPLE_DIR = Path(__file__).resolve().parents[1] / "vendor" / "omrchecker" / "s
 def test_run_omr_raises_on_invalid_template(tmp_path: Path):
     # template_dir vazio (sem template.json) + imagem → OMRChecker acha imagem sem template
     # → OmrEngineError (NOT "Unknown arguments" / exit 11)
-    with pytest.raises(OmrEngineError):
+    with pytest.raises(OmrEngineError) as ei:
         run_omr(b"not-a-real-image", tmp_path)
+
+    assert ei.value.codigo == CodigoFalha.MOTOR_FALHOU
+    # a falha tem que ser a do template ausente, e não qualquer morte do motor: sem esta
+    # asserção o teste ficava verde no CI justamente quando o motor nem chegava a subir
+    # (foi assim que o ScreenInfoError headless passou batido — ver tests/test_headless.py)
+    assert "No template file found" in ei.value.detalhe
 
 
 @pytest.mark.integration
