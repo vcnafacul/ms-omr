@@ -50,10 +50,21 @@ conhece).
   template (`template.json` + `config.json` + markers), **não** folhas de resposta.
 - **Headless:** o wrapper força `outputs.show_image_level = 0` no config (evita `cv2.imshow`/
   `plt.show`, que travam sem display) e roda com `MPLBACKEND=Agg`. Container precisa de
-  `libglib2.0-0` e `libgomp1` (opencv headless).
+  `libglib2.0-0` e `libgomp1` (opencv headless). Nada do motor pode exigir display **em tempo de
+  import** — ver o patch abaixo.
+- **Patches locais no vendor** (marcados com `# [patch vcnafacul]` no código):
+  - `src/utils/interaction.py`: o módulo chamava `get_monitors()[0]` no import e o motor morria no
+    container com `ScreenInfoError: No enumerators available` (sem X11 e sem `/dev/dri` o
+    `screeninfo` não acha enumerador algum) — todo cartão virava `motor_falhou`. Virou `try/except`
+    com dimensão fixa; as dimensões só posicionam janelas, que nunca abrem headless.
 
-O teste de integração (`tests/test_omr_engine.py`, marca `integration`) roda o OMRChecker de
-verdade contra um sample vendorizado.
+  Ao re-copiar o fork, **reaplique os patches** (ou suba-os para o fork antes). `tests/test_headless.py`
+  trava a regressão e o CI roda um smoke do import dentro da imagem antes de publicá-la.
+
+Os testes de integração (marca `integration`) rodam o OMRChecker de verdade — contra um sample
+vendorizado (`tests/test_omr_engine.py`) e contra uma foto real de cartão preenchido
+(`tests/test_cartao_real.py`). O CI só roda `-m "not integration"`, então rode-os localmente antes
+de mexer no motor ou no vendor.
 
 ## Códigos de falha (contrato com o ms-simulado)
 

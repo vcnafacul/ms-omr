@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import cv2
 from screeninfo import get_monitors
@@ -6,7 +7,15 @@ from screeninfo import get_monitors
 from src.logger import logger
 from src.utils.image import ImageUtils
 
-monitor_window = get_monitors()[0]
+# [patch vcnafacul] o import não pode exigir um monitor.
+# Num container headless (sem X11 e sem /dev/dri) o screeninfo não acha enumerador algum e
+# levanta ScreenInfoError, matando o motor antes de ler a imagem. Essas dimensões só são
+# usadas por InteractionUtils.show para posicionar janelas — código que nunca roda headless —,
+# então um fallback fixo é inofensivo e mantém o comportamento em máquinas com display.
+try:
+    monitor_window = get_monitors()[0]
+except Exception:
+    monitor_window = SimpleNamespace(width=1920, height=1080)
 
 
 @dataclass
