@@ -47,7 +47,7 @@ def _codigo_transitorio(exc: Exception) -> CodigoFalha:
     return CodigoFalha.ERRO_INTERNO
 
 
-def _ler_respostas(image_key: str) -> list[dict]:
+def _ler_respostas(image_key: str) -> tuple[list[dict], dict[str, str]]:
     """Parte SÍNCRONA/bloqueante (boto3 + subprocess do OMRChecker). Roda num thread
     via run_in_executor. Levanta FalhaNegocio nos casos de negócio; propaga transitórios."""
     simulado_id = parse_simulado_id(image_key)
@@ -62,17 +62,21 @@ def _ler_respostas(image_key: str) -> list[dict]:
             leitura = ler_cartao(image_key, image, tpl_dir)
         except OmrEngineError as exc:
             raise FalhaNegocio(exc.codigo, exc.detalhe) from exc
-        return [r.model_dump() for r in leitura.respostas]
+        return [r.model_dump() for r in leitura.respostas], leitura.campos
     finally:
         if tpl_dir is not None:
             shutil.rmtree(tpl_dir, ignore_errors=True)
 
 
 async def _entregar_ok(
-    ctx, image_key: str, respostas: list[dict], tentativa_id: str | None = None
+    ctx,
+    image_key: str,
+    respostas: list[dict],
+    tentativa_id: str | None = None,
+    campos: dict[str, str] | None = None,
 ) -> None:
     try:
-        await callback.enviar_resultado_ok(image_key, respostas, tentativa_id)
+        await callback.enviar_resultado_ok(image_key, respostas, tentativa_id, campos)
     except Exception as exc:
         _retry_ou_desistir(ctx, image_key, exc)
 
@@ -132,7 +136,7 @@ async def process_cartao(ctx, image_key: str, tentativa_id: str | None = None) -
     """
     loop = asyncio.get_running_loop()
     try:
-        respostas = await loop.run_in_executor(None, _ler_respostas, image_key)
+        respostas, campos = await loop.run_in_executor(None, _ler_respostas, image_key)
     except FalhaNegocio as fn:
         await _entregar_falha(ctx, image_key, fn.motivo, fn.detalhe, tentativa_id)
     except Exception as exc:
@@ -142,4 +146,4 @@ async def process_cartao(ctx, image_key: str, tentativa_id: str | None = None) -
             raise Retry(defer=_tentativa(ctx) * _BACKOFF_SEGUNDOS) from exc
         await _entregar_falha(ctx, image_key, _codigo_transitorio(exc), str(exc), tentativa_id)
     else:
-        await _entregar_ok(ctx, image_key, respostas, tentativa_id)
+        await _entregar_ok(ctx, image_key, respostas, tentativa_id, campos)

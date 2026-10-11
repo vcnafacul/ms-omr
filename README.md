@@ -31,7 +31,12 @@ Quem chama o ms-omr é o `ms-simulado` — nunca o frontend. O serviço não é 
 2. o worker baixa a imagem do bucket (S3 / Cloudflare R2 / MinIO local), com cache no Redis
 3. o OMRChecker lê o cartão usando o `template.json` da versão correspondente
 4. o resultado vai por `POST` na `CALLBACK_URL` (o `ms-simulado`, em `v1/cartao-resposta/callback`):
-   - sucesso → `{"imageKey": "...", "respostas": [...]}`
+   - sucesso → `{"imageKey": "...", "respostas": [...], "campos": {...}}`
+     - `campos` (tickets/038): os campos do template que não são questão (`q<n>`) nem matrícula
+       (`m<n>`), **crus**. Hoje só o cartão da prova do ENEM Dia 1 do cursinho tem um:
+       `{"idioma": "ING" | "ESP" | "" | "INGESP"}` (vazio = nenhuma marcada; `INGESP` = as duas).
+       O ms-omr não interpreta — quem escolhe o simulado é o ms-simulado. Cartão sem campo extra
+       → `{}`.
    - falha → `{"imageKey": "...", "falha": {"motivo": "<código>", "detalhe": "..."}}`
 
 Falhas transitórias são re-tentadas pelo arq até `OMR_MAX_TRIES` (default 3, backoff linear de 30s)
