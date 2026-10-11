@@ -37,7 +37,17 @@ async def test_ok_monta_payload(monkeypatch):
         "imageKey": "cartoes/1/a",
         "respostas": [{"questao": "1", "alternativaEstudante": "A"}],
         "tentativaId": None,
+        # tickets/038: sempre presente; vazio no cartão sem campo extra.
+        "campos": {},
     }
+
+
+async def test_ok_leva_os_campos_extras(monkeypatch):
+    FakeClient.posted = []
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    await callback.enviar_resultado_ok("cartoes/1/a", [], "tok", {"idioma": "INGESP"})
+    _, body = FakeClient.posted[0]
+    assert body["campos"] == {"idioma": "INGESP"}
 
 
 async def test_falha_monta_payload(monkeypatch):

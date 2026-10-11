@@ -5,6 +5,7 @@ import pytest
 from app.services.cartao_reader import (
     LeituraCartao,
     RespostaCartao,
+    _demais_campos,
     _estruturar_respostas,
     ler_cartao,
 )
@@ -27,6 +28,13 @@ def test_estruturar_filtra_single_omite_branco_dupla_e_matricula():
         RespostaCartao(questao="1", alternativaEstudante="A"),
         RespostaCartao(questao="10", alternativaEstudante="C"),
     ]
+
+
+def test_demais_campos_sao_os_que_nao_sao_questao_nem_matricula():
+    """tickets/038 (R13): o idioma vai cru — inclusive vazio (nenhuma) e duplo (as duas)."""
+    assert _demais_campos({"q1": "A", "m1": "2", "idioma": "INGESP"}) == {"idioma": "INGESP"}
+    assert _demais_campos({"q1": "A", "idioma": ""}) == {"idioma": ""}
+    assert _demais_campos({"q1": "A", "m8": "1"}) == {}
 
 
 def test_estruturar_ordena_por_numero():

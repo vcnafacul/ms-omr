@@ -9,18 +9,19 @@ from app.services.bucket_storage import StorageError, StorageNotFound
 from app.services.omr_engine import OmrEngineError, OmrTimeout
 
 
-def _leitura():
+def _leitura(campos=None):
     return SimpleNamespace(
         respostas=[
             SimpleNamespace(model_dump=lambda: {"questao": "1", "alternativaEstudante": "A"})
-        ]
+        ],
+        campos=campos or {},
     )
 
 
 def _patch(monkeypatch, **over):
     # `token` guarda o tentativa_id de cada entrega separado das tuplas historicas,
     # para nao mexer nas assercoes de payload que ja existiam.
-    calls = {"ok": [], "falha": [], "token": []}
+    calls = {"ok": [], "falha": [], "token": [], "campos": []}
     monkeypatch.setattr(pipe, "obter_imagem", over.get("obter_imagem", lambda k: b"img"))
     monkeypatch.setattr(
         pipe,
@@ -29,9 +30,10 @@ def _patch(monkeypatch, **over):
     )
     monkeypatch.setattr(pipe, "ler_cartao", over.get("ler_cartao", lambda k, i, t: _leitura()))
 
-    async def ok(k, r, t=None):
+    async def ok(k, r, t=None, campos=None):
         calls["ok"].append((k, r))
         calls["token"].append(t)
+        calls["campos"].append(campos)
 
     async def falha(k, m, d=None, t=None):
         calls["falha"].append((k, m, d))
@@ -251,3 +253,16 @@ async def test_token_chega_no_callback_de_transitorio_esgotado(monkeypatch):
     calls = _patch(monkeypatch, ler_cartao=boom)
     await pipe.process_cartao({"job_try": 3}, "cartoes/665/a", "T1")
     assert calls["token"] == ["T1"]
+
+
+async def test_campos_extras_chegam_no_callback_de_sucesso(monkeypatch):
+    """tickets/038 (R13): o idioma do cartão da prova vai junto das respostas, cru."""
+    calls = _patch(monkeypatch, ler_cartao=lambda k, i, t: _leitura({"idioma": "ESP"}))
+    await pipe.process_cartao(None, "cartoes/665/a", "tok")
+    assert calls["campos"] == [{"idioma": "ESP"}]
+
+
+async def test_cartao_sem_campo_extra_manda_campos_vazio(monkeypatch):
+    calls = _patch(monkeypatch)
+    await pipe.process_cartao(None, "cartoes/665/a")
+    assert calls["campos"] == [{}]

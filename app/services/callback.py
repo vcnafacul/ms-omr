@@ -14,9 +14,21 @@ async def _post(payload: dict) -> None:
 
 
 async def enviar_resultado_ok(
-    image_key: str, respostas: list[dict], tentativa_id: str | None = None
+    image_key: str,
+    respostas: list[dict],
+    tentativa_id: str | None = None,
+    campos: dict[str, str] | None = None,
 ) -> None:
-    await _post({"imageKey": image_key, "respostas": respostas, "tentativaId": tentativa_id})
+    # tickets/038 (R13): `campos` sempre presente (objeto vazio no cartão sem campo extra). O
+    # ms-simulado antigo descarta o campo em silêncio (whitelist sem forbidNonWhitelisted).
+    await _post(
+        {
+            "imageKey": image_key,
+            "respostas": respostas,
+            "tentativaId": tentativa_id,
+            "campos": campos or {},
+        }
+    )
 
 
 async def enviar_resultado_falha(
