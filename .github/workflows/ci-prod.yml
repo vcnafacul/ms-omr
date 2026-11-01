@@ -46,9 +46,9 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST_PROD }}
           username: ${{ secrets.DEPLOY_USER_PROD }}
           password: ${{ secrets.DEPLOY_PASS_PROD }}
-          script: |
-            chmod +x ~/subir_ms_omr.sh
-            ~/subir_ms_omr.sh
+          # compose do vcnafacul-stack (tickets/057): sobe a versão da tag e espera healthy;
+          # rollback no servidor: ~/stack/deploy.sh rollback ms-omr
+          script: ~/stack/deploy.sh ms-omr ${{ github.ref_name }}
 
   CREATE_RELEASE:
     needs: DEPLOY_PROD
