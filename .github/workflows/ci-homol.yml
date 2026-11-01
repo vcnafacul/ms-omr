@@ -33,11 +33,19 @@ jobs:
   PUSH:
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: develop
           fetch-depth: 0
+      # Tag do commit que virou imagem (o checkout é a ponta da develop): o
+      # deploy.sh do vcnafacul-stack sobe exatamente essa, e o rollback volta
+      # para a anterior (tickets/056, card 03).
+      - name: Tag do commit
+        id: tag
+        run: echo "tag=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Build Docker image
         run: docker build -t vcnafacul/ms-omr:latest -f omr.dockerfile .
       # a imagem não pode subir com o motor quebrado: no container não há X11/DRM nem display,
@@ -49,9 +57,12 @@ jobs:
       - name: Docker login
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
       - name: Push Docker image
-        run: docker push vcnafacul/ms-omr:latest
+        run: |
+          docker tag vcnafacul/ms-omr:latest vcnafacul/ms-omr:${{ steps.tag.outputs.tag }}
+          docker push vcnafacul/ms-omr:${{ steps.tag.outputs.tag }}
+          docker push vcnafacul/ms-omr:latest
 
-  # No merge pra develop: SSH no servidor de homolog e roda o script de subida.
+  # No merge pra develop: SSH no servidor de homolog e sobe pelo compose do vcnafacul-stack.
   DEPLOY_HOMOL:
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.base_ref == 'develop'
     needs: PUSH
@@ -63,6 +74,5 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST_HOMOL }}
           username: ${{ secrets.DEPLOY_USER_HOMOL }}
           password: ${{ secrets.DEPLOY_PASS_HOMOL }}
-          script: |
-            chmod +x ~/subir_ms_omr.sh
-            ~/subir_ms_omr.sh
+          # troca só o ms-omr e espera healthy (tickets/056)
+          script: ~/stack/deploy.sh ms-omr ${{ needs.PUSH.outputs.tag }}
